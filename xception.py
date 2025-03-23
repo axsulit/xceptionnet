@@ -82,9 +82,9 @@ def train_model(train_dir, val_dir, test_dir, num_epochs=100, batch_size=8, lear
                 print(f"Using {subset_size} images out of {total_size} total images for {name}")
     
     # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=10)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=10)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=10)
     
     print(f"Dataset sizes: Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}")
 
