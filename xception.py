@@ -51,9 +51,10 @@ def evaluate_model(model, data_loader, device, phase='val'):
     
     return metrics
 
-def train_model(train_dir, val_dir, test_dir, num_epochs=100, batch_size=8, learning_rate=0.00005):
+def train_model(train_dir, val_dir, test_dir, num_epochs=100, batch_size=8, learning_rate=0.00005, subset_size=None):
     """
     Train and evaluate the Xception model
+    :param subset_size: If provided, use only this many images for each split (train/val/test)
     """
     # Determine device
     device = torch.device("mps" if torch.backends.mps.is_available() 
@@ -65,6 +66,20 @@ def train_model(train_dir, val_dir, test_dir, num_epochs=100, batch_size=8, lear
     train_dataset = datasets.ImageFolder(train_dir, transform=xception_default_data_transforms['train'])
     val_dataset = datasets.ImageFolder(val_dir, transform=xception_default_data_transforms['test'])
     test_dataset = datasets.ImageFolder(test_dir, transform=xception_default_data_transforms['test'])
+    
+    # Create subsets if specified
+    if subset_size is not None:
+        for dataset, name in [(train_dataset, 'train'), (val_dataset, 'val'), (test_dataset, 'test')]:
+            total_size = len(dataset)
+            if subset_size < total_size:
+                indices = random.sample(range(total_size), subset_size)
+                if name == 'train':
+                    train_dataset = Subset(dataset, indices)
+                elif name == 'val':
+                    val_dataset = Subset(dataset, indices)
+                else:
+                    test_dataset = Subset(dataset, indices)
+                print(f"Using {subset_size} images out of {total_size} total images for {name}")
     
     # Create data loaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
@@ -159,6 +174,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_epochs', '-e', type=int, default=100)
     parser.add_argument('--batch_size', '-b', type=int, default=8)
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.00005)
+    parser.add_argument('--subset_size', '-s', type=int, default=None,
+                       help='Number of images to use for each split (train/val/test)')
     parser.add_argument('--output_model', '-o', type=str, default='xception_df.pth')
     
     args = parser.parse_args()
@@ -170,9 +187,10 @@ if __name__ == '__main__':
         test_dir=args.test_dir,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
-        learning_rate=args.learning_rate
+        learning_rate=args.learning_rate,
+        subset_size=args.subset_size
     )
     
     # Save the best model
-    torch.save(model.state_dict(), args.output_model, weights_only=True)
+    torch.save(model.state_dict(), args.output_model)
     print(f'Model saved to {args.output_model}') 
