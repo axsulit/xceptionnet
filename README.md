@@ -1,24 +1,44 @@
-# Classification
+# DeepFake Detection using XceptionNet
 
-XceptionNet from our paper trained on our FaceForensics++ dataset. Besides the full image models, all models were trained on slightly enlarged face crops with a scale factor of 1.3.
-The models were trained using the Face2Face face tracker, though the `detect_from_models.py` file uses the freely available dlib face detector.
+XceptionNet implementation for deepfake detection, trained on the FaceForensics++ dataset. The models are trained on slightly enlarged face crops with a scale factor of 1.3.
 
-Note that we provide the trained models from our paper which have not been fine-tuned for general compressed videos. You can find our used models under [this link](http://kaldir.vc.in.tum.de:/FaceForensics/models/faceforensics++_models.zip).   
+## Requirements
 
-Setup:
-- Install required modules via `requirement.txt` file
-- Run detection from a single video file or folder with
-```shell
-python detect_from_video.py
--i <path to input video or folder of videos with extenstion '.mp4' or '.avi'>
--m <path to model file, default is imagenet model
--o <path to output folder, will contain output video(s)
-```  
-from the classification folder. Enable cuda with ```--cuda```  or see parameters with ```python detect_from_video.py -h```.
+- Python 3.8+
+- See requirements.txt for all dependencies
 
+## Installation
 
+1. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-# Requirements
+## Usage
 
-- python 3.8
-- requirements.txt
+### Training the Model
+
+Train the XceptionNet model on your dataset:
+```bash
+python xception.py 
+    -d <path to training data directory>
+    -v <path to validation data directory>
+    -t <path to test data directory>
+    [-p <path to pretrained weights>]
+    [-m <path to existing model to continue training>]
+    [-b batch_size]
+    [-e num_epochs]
+    [-lr learning_rate]
+    [-s subset_size]
+    [-o output_model_path]
+```
+
+Optional arguments:
+- `-p`: Path to pretrained Xception weights (default: model.pth)
+- `-m`: Path to existing model weights to continue training
+- `-b`: Batch size (default: 8)
+- `-e`: Number of epochs (default: 100)
+- `-lr`: Learning rate (default: 0.00005)
+- `-s`: Number of images to use for training (subset for testing)
+- `-o`: Output path for trained model (default: xception_df.pth)
+- `--cuda`: Enable CUDA for GPU acceleration
