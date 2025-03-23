@@ -1,0 +1,50 @@
+[project]
+name = "xception"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Anne Sulit", email = "92159716+axsulit@users.noreply.github.com" }
+]
+dependencies = [
+    "numpy>=1.16.2",
+    "Pillow>=5.4.1",
+    "six>=1.12.0",
+    "tqdm>=4.25.0",
+    "certifi>=2018.11.29",
+    "cffi>=1.12.1",
+    "pycparser>=2.19",
+    "cmake>=3.12.0",
+    "olefile>=0.46",
+    "pathlib>=1.0.1",
+    "absl-py>=0.4.0",
+    "astor>=0.7.1",
+    "gast>=0.2.0",
+    "grpcio>=1.14.1",
+    "h5py>=2.8.0",
+    "Markdown>=2.6.11",
+    "protobuf>=3.6.1",
+    "termcolor>=1.1.0",
+    "ffmpy>=0.2.2",
+    "opencv-python>=3.4.1.15",
+    "pretrainedmodels>=0.7.4",
+    "torch>=1.0.1",
+    "torchvision>=0.2.1",
+    "Keras>=2.2.0",
+    "dlib>=19.24.6",
+]
+readme = "README.md"
+requires-python = ">= 3.8"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.rye]
+managed = true
+dev-dependencies = []
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/xception"]
