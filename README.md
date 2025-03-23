@@ -20,5 +20,5 @@ from the classification folder. Enable cuda with ```--cuda```  or see parameters
 
 # Requirements
 
-- python 3.6
+- python 3.8
 - requirements.txt
