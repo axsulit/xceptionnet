@@ -24,8 +24,6 @@ python xception.py
     -d <path to training data directory>
     -v <path to validation data directory>
     -t <path to test data directory>
-    [-p <path to pretrained weights>]
-    [-m <path to existing model to continue training>]
     [-b batch_size]
     [-e num_epochs]
     [-lr learning_rate]
@@ -34,8 +32,6 @@ python xception.py
 ```
 
 Optional arguments:
-- `-p`: Path to pretrained Xception weights (default: model.pth)
-- `-m`: Path to existing model weights to continue training
 - `-b`: Batch size (default: 8)
 - `-e`: Number of epochs (default: 100)
 - `-lr`: Learning rate (default: 0.00005)
