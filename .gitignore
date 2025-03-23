@@ -13,3 +13,4 @@ wheels/
 /output
 /celeb-df_imgs
 /celeb-df_orig
+*.pth
