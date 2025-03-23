@@ -135,14 +135,28 @@ def test_full_image_network(video_path, model_path, output_path,
     model, *_ = model_selection(modelname='xception', num_out_classes=2)
     if model_path is not None:
         state_dict = torch.load(model_path, weights_only=True)
-        # Fix the state dict keys
+        # Fix the state dict keys and shapes
         new_state_dict = {}
         for k, v in state_dict.items():
-            if k.startswith('fc'):
-                k = k.replace('fc', 'last_linear')
-            new_state_dict['model.' + k] = v
-        model.load_state_dict(new_state_dict)
-        print('Model found in {}'.format(model_path))
+            # Skip the final classification layer as it's for 1000 classes
+            if k.startswith('fc') or k.startswith('last_linear'):
+                continue
+            
+            # Add model prefix
+            new_key = 'model.' + k
+            
+            # Handle pointwise convolutions
+            if 'pointwise.weight' in k:
+                if len(v.shape) == 2:
+                    v = v.unsqueeze(-1).unsqueeze(-1)
+            
+            new_state_dict[new_key] = v
+        
+        # Load the modified state dict
+        missing_keys, unexpected_keys = model.load_state_dict(new_state_dict, strict=False)
+        print(f'Model found in {model_path}')
+        print(f'Missing keys: {missing_keys}')
+        print(f'Unexpected keys: {unexpected_keys}')
     else:
         print('No model found, initializing random model.')
     if cuda:
