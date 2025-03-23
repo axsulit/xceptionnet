@@ -11,3 +11,5 @@ wheels/
 /celeb-df
 .DS_Store
 /output
+/celeb-df_imgs
+/celeb-df_orig
