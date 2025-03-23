@@ -22,8 +22,7 @@ def return_pytorch04_xception(pretrained=True):
         # Load model in torch 0.4+
         model.fc = model.last_linear
         del model.last_linear
-        state_dict = torch.load(
-            '/Users/axsulit/Documents/thesis/xceptionnet/model.pth')
+        state_dict = torch.load('network/model.pth')
         for name, weights in state_dict.items():
             if 'pointwise' in name:
                 state_dict[name] = weights.unsqueeze(-1).unsqueeze(-1)
