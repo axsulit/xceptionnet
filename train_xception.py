@@ -7,125 +7,172 @@ import os
 from tqdm import tqdm
 import argparse
 import random
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+import numpy as np
 
 from network.models import model_selection
 from dataset.transform import xception_default_data_transforms
 
-def train_model(data_dir, num_epochs=100, batch_size=8, subset_size=None, cuda=True):
+def evaluate_model(model, data_loader, device, phase='val'):
     """
-    Train the Xception model on image dataset
-    
-    :param data_dir: Directory containing 'real' and 'fake' subdirectories
-    :param num_epochs: Number of training epochs
-    :param batch_size: Batch size for training
-    :param subset_size: If provided, use only this many images for training
-    :param cuda: Whether to use GPU
+    Evaluate the model on validation/test set
     """
-    # Create dataset
-    train_dataset = datasets.ImageFolder(
-        data_dir,
-        transform=xception_default_data_transforms['train']
-    )
+    model.eval()
+    all_preds = []
+    all_labels = []
+    running_loss = 0.0
+    criterion = nn.CrossEntropyLoss()
     
-    # Create a subset if specified
-    if subset_size is not None:
-        total_size = len(train_dataset)
-        if subset_size < total_size:
-            indices = random.sample(range(total_size), subset_size)
-            train_dataset = Subset(train_dataset, indices)
-            print(f"Using {subset_size} images out of {total_size} total images")
+    with torch.no_grad():
+        pbar = tqdm(data_loader, desc=f'{phase.capitalize()} Phase')
+        for inputs, labels in pbar:
+            inputs, labels = inputs.to(device), labels.to(device)
+            
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            running_loss += loss.item()
+            
+            _, preds = torch.max(outputs, 1)
+            
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
     
-    # Create data loader with larger batch size
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True
-    )
+    # Calculate metrics
+    accuracy = accuracy_score(all_labels, all_preds)
+    precision, recall, f1, _ = precision_recall_fscore_support(all_labels, all_preds, average='binary')
     
-    print(f"Number of batches per epoch: {len(train_loader)}")
+    metrics = {
+        'loss': running_loss / len(data_loader),
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+        'f1': f1
+    }
     
+    return metrics
+
+def train_model(train_dir, val_dir, test_dir, num_epochs=100, batch_size=8, learning_rate=0.00005):
+    """
+    Train and evaluate the Xception model
+    """
+    # Determine device
+    device = torch.device("mps" if torch.backends.mps.is_available() 
+                        else "cuda" if torch.cuda.is_available() 
+                        else "cpu")
+    print(f"Using device: {device}")
+
+    # Create datasets
+    train_dataset = datasets.ImageFolder(train_dir, transform=xception_default_data_transforms['train'])
+    val_dataset = datasets.ImageFolder(val_dir, transform=xception_default_data_transforms['test'])
+    test_dataset = datasets.ImageFolder(test_dir, transform=xception_default_data_transforms['test'])
+    
+    # Create data loaders
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+    
+    print(f"Dataset sizes: Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}")
+
     # Initialize model
     model, *_ = model_selection(modelname='xception', num_out_classes=2)
-    if cuda:
-        model = model.cuda()
+    model = model.to(device)
 
-    # Loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
-    # Training loop
+    # For early stopping
+    best_val_loss = float('inf')
+    patience = 5
+    patience_counter = 0
+    best_model_state = None
+    
     for epoch in range(num_epochs):
+        # Training phase
         model.train()
         running_loss = 0.0
-        correct = 0
-        total = 0
+        train_preds = []
+        train_labels = []
         
         pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{num_epochs}')
         for inputs, labels in pbar:
-            if cuda:
-                inputs, labels = inputs.cuda(), labels.cuda()
+            inputs, labels = inputs.to(device), labels.to(device)
             
-            # Zero the parameter gradients
             optimizer.zero_grad()
-            
-            # Forward pass
             outputs = model(inputs)
             loss = criterion(outputs, labels)
-            
-            # Backward pass and optimize
             loss.backward()
             optimizer.step()
             
-            # Statistics
             running_loss += loss.item()
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+            _, preds = torch.max(outputs, 1)
+            train_preds.extend(preds.cpu().numpy())
+            train_labels.extend(labels.cpu().numpy())
             
-            # Update progress bar
-            pbar.set_postfix({
-                'loss': f'{running_loss/len(pbar):.4f}',
-                'acc': f'{100 * correct/total:.2f}%'
-            })
+            pbar.set_postfix({'train_loss': f'{running_loss/len(pbar):.4f}'})
         
-        pbar.close()
+        # Validation phase
+        val_metrics = evaluate_model(model, val_loader, device, 'val')
         
-        print(f'Epoch {epoch+1} - Loss: {running_loss/len(train_loader):.4f}, '
-              f'Accuracy: {100 * correct/total:.2f}%')
+        # Print epoch results
+        print(f'\nEpoch {epoch+1}/{num_epochs}:')
+        print(f'Train Loss: {running_loss/len(train_loader):.4f}')
+        print(f'Val Loss: {val_metrics["loss"]:.4f}')
+        print(f'Val Accuracy: {val_metrics["accuracy"]:.4f}')
+        print(f'Val Precision: {val_metrics["precision"]:.4f}')
+        print(f'Val Recall: {val_metrics["recall"]:.4f}')
+        print(f'Val F1: {val_metrics["f1"]:.4f}')
+        
+        # Early stopping
+        if val_metrics['loss'] < best_val_loss:
+            best_val_loss = val_metrics['loss']
+            best_model_state = model.state_dict().copy()
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= patience:
+                print(f'\nEarly stopping triggered after epoch {epoch+1}')
+                break
     
-    return model
+    # Load best model for testing
+    model.load_state_dict(best_model_state)
+    
+    # Final evaluation on test set
+    test_metrics = evaluate_model(model, test_loader, device, 'test')
+    
+    print('\nFinal Test Results:')
+    print(f'Test Accuracy: {test_metrics["accuracy"]:.4f}')
+    print(f'Test Precision: {test_metrics["precision"]:.4f}')
+    print(f'Test Recall: {test_metrics["recall"]:.4f}')
+    print(f'Test F1: {test_metrics["f1"]:.4f}')
+    
+    return model, test_metrics
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--data_dir', '-d', type=str, required=True,
-                       help='Directory containing real and fake image folders')
-    parser.add_argument('--num_epochs', '-e', type=int, default=100,
-                       help='Number of training epochs')
-    parser.add_argument('--batch_size', '-b', type=int, default=8,
-                       help='Training batch size')
-    parser.add_argument('--subset_size', '-s', type=int, default=None,
-                       help='Number of images to use for training')
-    parser.add_argument('--learning_rate', '-lr', type=float, default=0.00005,
-                       help='Learning rate')
-    parser.add_argument('--cuda', action='store_true',
-                       help='Use GPU for training')
-    parser.add_argument('--output_model', '-o', type=str, default='xception_df.pth',
-                       help='Path to save the trained model')
+    parser.add_argument('--train_dir', '-d', type=str, required=True,
+                       help='Directory containing training images')
+    parser.add_argument('--val_dir', '-v', type=str, required=True,
+                       help='Directory containing validation images')
+    parser.add_argument('--test_dir', '-t', type=str, required=True,
+                       help='Directory containing test images')
+    parser.add_argument('--num_epochs', '-e', type=int, default=100)
+    parser.add_argument('--batch_size', '-b', type=int, default=8)
+    parser.add_argument('--learning_rate', '-lr', type=float, default=0.00005)
+    parser.add_argument('--output_model', '-o', type=str, default='xception_df.pth')
     
     args = parser.parse_args()
     
-    # Train the model
-    model = train_model(
-        data_dir=args.data_dir,
+    # Train and evaluate the model
+    model, test_metrics = train_model(
+        train_dir=args.train_dir,
+        val_dir=args.val_dir,
+        test_dir=args.test_dir,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
-        subset_size=args.subset_size,
-        cuda=args.cuda
+        learning_rate=args.learning_rate
     )
     
-    # Save the trained model
-    torch.save(model.state_dict(), args.output_model)
+    # Save the best model
+    torch.save(model.state_dict(), args.output_model, weights_only=True)
     print(f'Model saved to {args.output_model}') 
