@@ -16,17 +16,34 @@ import torchvision
 
 
 def return_pytorch04_xception(pretrained=True):
-    # Raises warning "src not broadcastable to dst" but thats fine
-    model = xception(pretrained=False)
+    # Initialize model with num_classes=2 instead of default 1000
+    model = xception(num_classes=2, pretrained=False)
     if pretrained:
         # Load model in torch 0.4+
         model.fc = model.last_linear
         del model.last_linear
-        state_dict = torch.load('network/model.pth')
-        for name, weights in state_dict.items():
-            if 'pointwise' in name:
-                state_dict[name] = weights.unsqueeze(-1).unsqueeze(-1)
-        model.load_state_dict(state_dict)
+        
+        # Load state dict
+        state_dict = torch.load('network/xception_df.pth')
+        
+        # Remove 'model.' prefix and fix layer names
+        new_state_dict = {}
+        for key, value in state_dict.items():
+            # Remove 'model.' prefix if it exists
+            if key.startswith('model.'):
+                key = key[6:]
+            
+            # Replace 'last_linear' with 'fc' in the key names
+            key = key.replace('last_linear', 'fc')
+                
+            # Handle pointwise convolutions
+            if 'pointwise' in key and len(value.shape) == 2:
+                value = value.unsqueeze(-1).unsqueeze(-1)
+                
+            new_state_dict[key] = value
+        
+        # Load the modified state dict
+        model.load_state_dict(new_state_dict)
         model.last_linear = model.fc
         del model.fc
     return model
