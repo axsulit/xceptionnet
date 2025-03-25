@@ -51,16 +51,24 @@ def evaluate_model(model, data_loader, device, phase='val'):
     
     return metrics
 
+def get_device():
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print(f"Using CUDA GPU: {torch.cuda.get_device_name(0)}")
+    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        device = torch.device("mps")
+        print("Using Apple MPS")
+    else:
+        device = torch.device("cpu")
+        print("Using CPU")
+    return device
+
 def train_model(train_dir, val_dir, test_dir, num_epochs=100, batch_size=8, learning_rate=0.00005, subset_size=None):
     """
     Train and evaluate the Xception model
-    :param subset_size: If provided, use only this many images for each split (train/val/test)
     """
-    # Determine device
-    device = torch.device("mps" if torch.backends.mps.is_available() 
-                        else "cuda" if torch.cuda.is_available() 
-                        else "cpu")
-    print(f"Using device: {device}")
+    # Modify device selection to handle different hardware
+    device = get_device()
 
     # Create datasets
     train_dataset = datasets.ImageFolder(train_dir, transform=xception_default_data_transforms['train'])
@@ -82,9 +90,9 @@ def train_model(train_dir, val_dir, test_dir, num_epochs=100, batch_size=8, lear
                 print(f"Using {subset_size} images out of {total_size} total images for {name}")
     
     # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=10)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=10)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=10)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
     
     print(f"Dataset sizes: Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}")
 
