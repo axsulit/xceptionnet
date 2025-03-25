@@ -24,7 +24,7 @@ def return_pytorch04_xception(pretrained=True):
         del model.last_linear
         
         # Load state dict
-        state_dict = torch.load('network/xception_df.pth')
+        state_dict = torch.load('network/xception_df_real.pth')
         
         # Remove 'model.' prefix and fix layer names
         new_state_dict = {}
